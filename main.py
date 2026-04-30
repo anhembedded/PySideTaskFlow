@@ -1,25 +1,16 @@
-import sys
 import os
+import sys
 
-# Dispatcher for the examples
 def main():
-    print("Select an application to run:")
-    print("1. Task Dashboard (GUI)")
-    print("2. Device Monitor (GUI)")
-    print("3. Batch Runner (CLI)")
-    print("4. CLI Runner (Dynamic)")
+    print("Task Framework Examples")
+    print("1. GUI Application (PySide6)")
+    print("2. CLI Application")
 
-    choice = input("Enter choice (1-4): ")
-
+    choice = input("Select (1-2): ")
     if choice == '1':
-        os.system("python3 apps/task_dashboard/main.py")
+        os.system("PYTHONPATH=. python3 apps/gui/main.py")
     elif choice == '2':
-        os.system("python3 apps/device_monitor/main.py")
-    elif choice == '3':
-        os.system("python3 apps/batch_runner/main.py")
-    elif choice == '4':
-        task = input("Enter task name (DemoTask, LongRunningTask, DeviceMonitorTask): ")
-        os.system(f"python3 cli/runner.py {task}")
+        os.system("PYTHONPATH=. python3 apps/cli/main.py")
     else:
         print("Invalid choice")
 

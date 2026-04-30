@@ -3,7 +3,7 @@ import os
 import threading
 from .interfaces import TaskRepository
 from .state import TaskState
-from .status import TaskStatus
+from domain.types import TaskStatus
 
 class JsonTaskRepository(TaskRepository):
     def __init__(self, filepath: str):
