@@ -1,0 +1,210 @@
+@startuml
+title Class Diagram - Task-Oriented UI Framework (PySide6 + CLI)
+
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+
+package "Domain Layer" {
+    interface TaskContext {
+        + report_progress(value: int): void
+        + report_message(message: str): void
+        + log(message: str): void
+        + is_cancelled(): bool
+    }
+
+    abstract class Task {
+        + name: str
+        + run(ctx: TaskContext): Any
+    }
+
+    class DownloadTask {
+        - url: str
+        - save_path: str
+        + run(ctx: TaskContext): Any
+    }
+
+    abstract class TaskFactory {
+        + create(): Task
+    }
+
+    class DownloadTaskFactory {
+        - url: str
+        - save_path: str
+        + create(): Task
+    }
+
+    enum TaskStatus {
+        PENDING
+        RUNNING
+        COMPLETED
+        FAILED
+        CANCELLED
+    }
+}
+
+package "Core Framework" {
+    class TaskState {
+        + id: str
+        + status: TaskStatus
+        + progress: int
+        + result: Any
+        + error: Optional[str]
+    }
+
+    class TaskHandle {
+        + cancel(): void
+        + subscribe(callback): void
+        + get_state(): TaskState
+    }
+
+    abstract class TaskExecutor {
+        + submit(task: Task): TaskHandle
+    }
+
+    class TaskRepository {
+        + add(state: TaskState): void
+        + update(state: TaskState): void
+        + get(task_id: str): TaskState
+    }
+
+    class TaskRegistry {
+        + register(task_type, factory): void
+        + create(task_type, *args, **kwargs): Task
+    }
+}
+
+package "Adapters (Qt)" {
+    class QtTaskContext implements TaskContext {
+        - signals: QtTaskSignals
+        - cancelled: bool
+        + report_progress(...)
+        + report_message(...)
+        + log(...)
+        + is_cancelled(): bool
+        + cancel(): void
+    }
+
+    class QtTaskSignals <<QObject>> {
+        Signal progress(int)
+        Signal message(str)
+        Signal error(str)
+        Signal finished(TaskStatus)
+    }
+
+    class QtTaskExecutor implements TaskExecutor {
+        - pool: QThreadPool
+        + submit(task: Task): TaskHandle
+    }
+
+    class QtTaskHandle implements TaskHandle {
+        - runner: QtTaskRunner
+        + cancel(): void
+        + subscribe(callback): void
+        + get_state(): TaskState
+    }
+
+    class QtTaskRunner <<QRunnable>> {
+        - task: Task
+        - ctx: QtTaskContext
+        - signals: QtTaskSignals
+        - state: TaskState
+        + run(): void
+    }
+}
+
+package "Adapters (CLI)" {
+    class CLITaskContext implements TaskContext {
+        + report_progress(...)
+        + report_message(...)
+        + log(...)
+        + is_cancelled(): bool
+    }
+
+    class CLITaskExecutor implements TaskExecutor {
+        + submit(task: Task): TaskHandle
+    }
+
+    class CLITaskHandle implements TaskHandle {
+        - thread: Optional[Thread]
+        - state: TaskState
+        + cancel(): void
+        + subscribe(callback): void
+        + get_state(): TaskState
+    }
+}
+
+package "Application Layer" {
+    class PresenterFactory {
+        - mapping: Dict[Type[QWidget], Type[BasePresenter]]
+        + register(view_cls, presenter_cls): void
+        + create(view): BasePresenter
+    }
+
+    abstract class BasePresenter {
+        - executor: TaskExecutor
+        + __init__(executor: TaskExecutor)
+        + bind(view: QWidget): void
+        + reconfigure(factory: TaskFactory): void
+    }
+
+    class MainWindow {
+        - factory: PresenterFactory
+        - executor: TaskExecutor
+        + __init__(factory, executor)
+        ...
+    }
+
+    class DownloadView <<QWidget>> {
+        + progress_bar: QProgressBar
+        + message_label: QLabel
+        + start_button: QPushButton
+        + cancel_button: QPushButton
+    }
+
+    class DownloadPresenter {
+        - view: DownloadView
+        - factory: TaskFactory
+        - handle: Optional[TaskHandle]
+        + bind(view): void
+        + on_start(): void
+        + on_cancel(): void
+        + on_progress(percent: int): void
+        + on_finished(status: TaskStatus): void
+    }
+}
+
+' Relations
+Task ..> TaskContext : uses
+Task <|-- DownloadTask
+TaskFactory <|-- DownloadTaskFactory
+DownloadTaskFactory ..> DownloadTask : creates
+
+TaskContext <|.. QtTaskContext
+TaskContext <|.. CLITaskContext
+
+TaskExecutor <|.. QtTaskExecutor
+TaskExecutor <|.. CLITaskExecutor
+TaskHandle <|.. QtTaskHandle
+TaskHandle <|.. CLITaskHandle
+
+QtTaskExecutor ..> QtTaskRunner : creates
+QtTaskRunner *-- QtTaskContext
+QtTaskRunner *-- QtTaskSignals
+QtTaskRunner o-- Task
+QtTaskHandle --> QtTaskRunner : controls
+
+BasePresenter ..> TaskExecutor : uses
+BasePresenter ..> TaskHandle : uses (cancel, subscribe)
+BasePresenter <|-- DownloadPresenter
+DownloadView ..> DownloadPresenter : "binds to"
+DownloadPresenter o-- TaskFactory
+DownloadPresenter ..> QtTaskHandle : subscribes
+
+PresenterFactory o-- BasePresenter : creates
+MainWindow *-- PresenterFactory
+MainWindow *-- TaskExecutor
+
+TaskRegistry o-- TaskFactory : registers
+TaskRepository o-- TaskState : stores
+TaskExecutor ..> TaskRepository : updates
+@enduml

@@ -1,0 +1,61 @@
+@startuml
+title Sequence Diagram - GUI Flow (Start & Cancel Task)
+
+actor User
+participant "MainWindow" as MW
+participant "PresenterFactory" as PF
+participant "DownloadPresenter" as Pres
+participant "DownloadView" as View
+participant "QtTaskExecutor" as Exec
+participant "QtTaskRunner" as Runner
+participant "QtTaskContext" as Ctx
+participant "DownloadTask" as Dom
+participant "TaskRepository" as Repo
+
+== Entry Point ==
+MW -> PF: create(DownloadView)
+PF -> Pres: <<create>> DownloadPresenter(executor)
+PF -> View: <<create>> DownloadView()
+PF -> Pres: bind(view)
+Pres -> View: kết nối nút Start/Cancel
+PF --> MW: trả về View
+
+== Start Task ==
+User -> View: click Start
+View -> Pres: on_start()
+Pres -> Pres: task = factory.create()
+Pres -> Exec: submit(task)
+Exec -> Runner: <<create>> QtTaskRunner(task)
+Exec -> Runner: run() (trong worker thread)
+Executor --> Pres: QtTaskHandle
+Pres -> QtTaskHandle: subscribe(on_progress, on_finished)
+Pres -> View: setRunning(handle.task_id)
+
+Runner -> Ctx: <<create>> QtTaskContext
+Runner -> Dom: run(ctx)
+loop mỗi bước
+    Dom -> Ctx: report_progress(i)
+    Ctx -> Pres: signal progress(i) -> on_progress
+    Pres -> View: setValue(i)
+    Dom -> Ctx: report_message(...)
+    Ctx -> Pres: signal message(str) -> set_message
+    Pres -> View: set_message(...)
+    Dom -> Ctx: is_cancelled()
+end
+Dom --> Runner: return
+Runner -> Repo: update(state)
+Runner -> Pres: signal finished(status) -> on_finished
+Pres -> View: setFinalState(status)
+
+== Cancel Task ==
+User -> View: click Cancel
+View -> Pres: on_cancel()
+Pres -> QtTaskHandle: cancel()
+QtTaskHandle -> Ctx: cancel()
+Ctx -> Ctx: set _cancelled = True
+Dom -> Ctx: is_cancelled() -> true
+Dom -> Ctx: report_message("cancelled")
+Dom --> Runner: return
+Runner -> Pres: signal finished(CANCELLED)
+Pres -> View: setFinalState(CANCELLED)
+@enduml
