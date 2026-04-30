@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
-from typing import Any, Optional
-from .status import TaskStatus
+from typing import Any, Optional, Dict
+from domain.types import TaskStatus
 
 @dataclass
 class TaskState:
@@ -10,4 +10,4 @@ class TaskState:
     progress: int = 0
     result: Any = None
     error: Optional[str] = None
-    metadata: dict = field(default_factory=dict)
+    metadata: Dict[str, Any] = field(default_factory=dict)

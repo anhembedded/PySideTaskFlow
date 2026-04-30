@@ -1,29 +1,26 @@
 @startuml
 actor User
-participant Presenter
-participant TaskExecutor
-participant Task
-participant TaskContext
-participant TaskRepository
-participant EventManager
+participant TaskPresenter
+participant TaskManager
+participant QtTaskRunner
+participant DomainTask
+participant QtProgressReporter
+participant TaskView
 
-User -> Presenter: Click "Start Task"
-Presenter -> TaskExecutor: execute(task, id, name)
-TaskExecutor -> TaskRepository: save(PENDING state)
-TaskExecutor -> TaskExecutor: start Worker thread
-activate TaskExecutor
+User -> TaskPresenter: on_start()
+TaskPresenter -> DomainTask: create via factory
+TaskPresenter -> QtTaskRunner: create(task)
+TaskPresenter -> TaskManager: submit_runner(runner)
+TaskManager -> QtTaskRunner: start (worker thread)
 
-TaskExecutor -> Task: run(ctx)
-activate Task
-Task -> TaskContext: report_progress(50)
-TaskContext -> TaskRepository: save(progress=50)
-TaskContext -> EventManager: emit("task_updated")
-EventManager -> Presenter: refresh_view()
-
-Task --> TaskExecutor: return result
-deactivate Task
-
-TaskExecutor -> TaskRepository: save(COMPLETED state)
-TaskExecutor -> EventManager: emit("task_updated")
-deactivate TaskExecutor
+activate QtTaskRunner
+QtTaskRunner -> DomainTask: execute(reporter)
+activate DomainTask
+DomainTask -> QtProgressReporter: report_progress(val)
+QtProgressReporter -> TaskView: emit signal -> update UI
+DomainTask -> QtProgressReporter: is_cancelled()
+DomainTask --> QtTaskRunner: return
+deactivate DomainTask
+QtTaskRunner -> TaskPresenter: finished signal
+deactivate QtTaskRunner
 @enduml

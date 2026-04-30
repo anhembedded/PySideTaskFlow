@@ -1,40 +1,42 @@
 @startuml
-interface Task {
-    +run(ctx: TaskContext): Any
-}
-
-interface TaskContext {
-    +report_progress(value: int)
+interface ProgressReporter {
+    +report_progress(percent: int)
+    +report_message(message: str)
     +is_cancelled(): bool
-    +log(message: str)
 }
 
-class TaskState {
-    +task_id: str
-    +status: TaskStatus
-    +progress: int
-    +result: Any
-    +error: str
+abstract class DomainTask {
+    +name: str
+    +execute(reporter: ProgressReporter)
 }
 
-interface TaskRepository {
-    +save(state: TaskState)
-    +get(id: str): TaskState
-    +get_all(): List[TaskState]
+abstract class TaskFactory {
+    +create_task(): DomainTask
+    +build_title(): str
 }
 
-abstract class TaskExecutor {
-    +execute(task: Task, id: str, name: str)
-    +cancel(id: str)
+class TaskManager {
+    -executor: TaskExecutor
+    -registry: TaskRegistry
+    +create_task(type, *args): TaskView
+    +submit_runner(runner)
 }
 
-class QtTaskExecutor extends TaskExecutor
-class CLITaskExecutor extends TaskExecutor
+class QtTaskRunner {
+    -domain_task: DomainTask
+    -reporter: QtProgressReporter
+    +run()
+    +cancel()
+}
 
-class QtProgressAdapter implements TaskContext
-class CLIProgressAdapter implements TaskContext
+ProgressReporter <|.. QtProgressReporter
+ProgressReporter <|.. ConsoleProgressReporter
+DomainTask <|-- DownloadTask
+DomainTask <|-- DeviceMonitorTask
+TaskFactory <|-- DownloadTaskFactory
+TaskFactory <|-- DeviceMonitorTaskFactory
 
-Task .right.> TaskContext
-TaskExecutor --> Task
-TaskExecutor --> TaskRepository
+QtTaskRunner o-- DomainTask
+QtTaskRunner *-- QtProgressReporter
+TaskManager o-- TaskExecutor
 @enduml
